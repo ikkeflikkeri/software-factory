@@ -75,3 +75,20 @@ describe("App routing", () => {
     expect(window.location.pathname).toBe("/")
   })
 })
+
+describe("App routing (trace)", () => {
+  it("renders the trace page for /trace/:issueNumber", () => {
+    window.history.replaceState(null, "", "/trace/7")
+    renderApp()
+
+    expect(container.textContent).toContain("Pipeline timeline for issue #7")
+    expect(container.textContent).not.toContain("Page not found")
+  })
+
+  it("does not treat malformed trace paths as a trace route", () => {
+    window.history.replaceState(null, "", "/trace/not-a-number")
+    renderApp()
+
+    expect(container.textContent).toContain("Page not found")
+  })
+})

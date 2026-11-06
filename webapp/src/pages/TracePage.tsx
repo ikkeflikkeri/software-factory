@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/PageHeader"
 import { StatusBadge } from "@/components/StatusBadge"
 import { fetchIssueTrace, GitHubApiError, relativeTime, type IssueTrace } from "@/lib/github"
 import { buildTraceSteps, type TraceStep } from "@/lib/trace"
+import { navigate } from "@/lib/router"
 import { useAsync, useNow } from "@/lib/useAsync"
 import { cn } from "cn"
 
@@ -57,13 +58,7 @@ function StepRow({ step, now }: { step: TraceStep; now: number }) {
   )
 }
 
-export function TracePage({
-  issueNumber,
-  onBack,
-}: {
-  issueNumber: number
-  onBack: () => void
-}) {
+export function TracePage({ issueNumber }: { issueNumber: number }) {
   const now = useNow()
   const trace = useAsync(() => fetchIssueTrace(issueNumber), [issueNumber])
 
@@ -86,7 +81,7 @@ export function TracePage({
           )
         }
         actions={
-          <Button variant="outline" size="sm" onClick={onBack}>
+          <Button variant="outline" size="sm" onClick={() => navigate("/activity")}>
             <ArrowLeft className="size-3.5" aria-hidden="true" />
             Activity
           </Button>

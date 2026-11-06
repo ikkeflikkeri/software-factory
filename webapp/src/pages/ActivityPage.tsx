@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input"
 import { EmptyState } from "@/components/EmptyState"
 import { PageHeader } from "@/components/PageHeader"
 import { fetchActivity, relativeTime, type ActivityItem } from "@/lib/github"
+import { navigate } from "@/lib/router"
 import { useAsync, useNow } from "@/lib/useAsync"
 
 const RATE_LIMIT_HINT =
@@ -39,7 +40,7 @@ function TimelineRow({ item, now }: { item: ActivityItem; now: number }) {
   )
 }
 
-function TraceForm({ onOpenTrace }: { onOpenTrace: (issueNumber: number) => void }) {
+function TraceForm() {
   const [value, setValue] = useState("")
   const trimmed = value.trim()
   const valid = /^\d+$/.test(trimmed)
@@ -49,7 +50,7 @@ function TraceForm({ onOpenTrace }: { onOpenTrace: (issueNumber: number) => void
       className="flex flex-wrap items-end gap-2 rounded-lg border border-border bg-card p-4"
       onSubmit={(event) => {
         event.preventDefault()
-        if (valid) onOpenTrace(Number(trimmed))
+        if (valid) navigate(`/trace/${trimmed}`)
       }}
     >
       <div className="flex min-w-48 flex-col gap-1">
@@ -73,7 +74,7 @@ function TraceForm({ onOpenTrace }: { onOpenTrace: (issueNumber: number) => void
   )
 }
 
-export function ActivityPage({ onOpenTrace }: { onOpenTrace: (issueNumber: number) => void }) {
+export function ActivityPage() {
   const now = useNow()
   const activity = useAsync(() => fetchActivity(30), [])
 
@@ -84,7 +85,7 @@ export function ActivityPage({ onOpenTrace }: { onOpenTrace: (issueNumber: numbe
         description="Recent merged pull requests and closed issues."
       />
 
-      <TraceForm onOpenTrace={onOpenTrace} />
+      <TraceForm />
 
       {activity.state === "loading" ? (
         <section className="rounded-lg border border-border bg-card p-4" aria-busy="true" aria-label="Loading activity">
