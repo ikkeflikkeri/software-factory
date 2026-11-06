@@ -5,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { ActivitySection } from "./ActivitySection"
 import { appName, features, hero } from "./homeContent"
 
 function App() {
@@ -41,6 +42,8 @@ function App() {
             ))}
           </ul>
         </section>
+
+        <ActivitySection />
       </main>
     </div>
   )
