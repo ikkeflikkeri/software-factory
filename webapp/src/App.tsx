@@ -6,11 +6,19 @@ import {
   Clock,
   GitBranch,
   LayoutDashboard,
+  Menu,
   Rocket,
   Settings,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { SidebarNav, type NavItem } from "@/components/SidebarNav"
 import { DataTable, type DataTableColumn } from "@/components/DataTable"
 import { StatusBadge, type Status } from "@/components/StatusBadge"
@@ -120,14 +128,25 @@ function PlaceholderPanel({ title, children }: { title: string; children: React.
   )
 }
 
-function DashboardTopBar({ section }: { section: string }) {
+function DashboardTopBar({ section, onOpenNav }: { section: string; onOpenNav: () => void }) {
   return (
-    <header className="sticky top-0 z-10 flex h-12 items-center justify-between gap-4 border-b border-border bg-background/95 px-6 backdrop-blur">
-      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-[13px]">
-        <span className="text-muted-foreground">software-factory</span>
-        <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden="true" />
-        <span className="font-medium">{section}</span>
-      </nav>
+    <header className="sticky top-0 z-10 flex h-12 items-center justify-between gap-4 border-b border-border bg-background/95 px-4 backdrop-blur md:px-6">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="md:hidden"
+          aria-label="Open navigation"
+          onClick={onOpenNav}
+        >
+          <Menu className="size-4" aria-hidden="true" />
+        </Button>
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-[13px]">
+          <span className="text-muted-foreground">software-factory</span>
+          <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden="true" />
+          <span className="font-medium">{section}</span>
+        </nav>
+      </div>
       <div className="flex items-center gap-3">
         <Button variant="outline" size="sm">Feedback</Button>
         <div
@@ -143,11 +162,17 @@ function DashboardTopBar({ section }: { section: string }) {
 
 function App() {
   const [activeId, setActiveId] = useState("overview")
+  const [navOpen, setNavOpen] = useState(false)
   const activeItem = navItems.find((item) => item.id === activeId) ?? navItems[0]
+
+  function selectNav(id: string) {
+    setActiveId(id)
+    setNavOpen(false)
+  }
 
   return (
     <div className="flex min-h-svh bg-background text-foreground">
-      <aside className="fixed inset-y-0 left-0 z-20 flex w-56 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+      <aside className="fixed inset-y-0 left-0 z-20 hidden w-56 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
         <div className="flex h-12 items-center gap-2 border-b border-sidebar-border px-4">
           <CircleDot className="size-4" aria-hidden="true" />
           <span className="text-[13px] font-semibold tracking-tight">software-factory</span>
@@ -163,9 +188,33 @@ function App() {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col pl-56">
-        <DashboardTopBar section={activeItem.label} />
-        <main className="flex flex-col gap-6 px-6 py-6">
+      <Sheet open={navOpen} onOpenChange={setNavOpen}>
+        <SheetContent
+          side="left"
+          className="w-64 gap-0 border-sidebar-border bg-sidebar p-0 text-sidebar-foreground"
+        >
+          <SheetHeader className="border-b border-sidebar-border px-4 py-3">
+            <SheetTitle className="flex h-6 items-center gap-2 text-[13px] font-semibold tracking-tight">
+              <CircleDot className="size-4" aria-hidden="true" />
+              software-factory
+            </SheetTitle>
+            <SheetDescription className="sr-only">Main navigation</SheetDescription>
+          </SheetHeader>
+          <SidebarNav
+            items={navItems}
+            activeId={activeId}
+            onSelect={selectNav}
+            className="px-2 py-3"
+          />
+          <div className="mt-auto border-t border-sidebar-border px-4 py-3 text-xs text-muted-foreground">
+            dsh-superagent pipeline
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <div className="flex min-w-0 flex-1 flex-col md:pl-56">
+        <DashboardTopBar section={activeItem.label} onOpenNav={() => setNavOpen(true)} />
+        <main className="flex flex-col gap-6 px-4 py-6 md:px-6">
           <PageHeader
             title="Overview"
             description="Status of the dsh-superagent pipeline and its deployments."
