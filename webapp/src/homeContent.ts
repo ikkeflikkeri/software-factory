@@ -20,6 +20,45 @@ export const hero = {
   ctaLabel: "Get started",
 }
 
+export type Step = {
+  title: string
+  description: string
+  icon: "issue" | "route" | "pull-request" | "review"
+}
+
+export const howItWorksHeading = {
+  title: "How it works",
+  description:
+    "From idea to merged code in four steps — the whole pipeline runs itself, you stay in control of the review.",
+}
+
+export const steps: Step[] = [
+  {
+    title: "1. Open a GitHub issue",
+    description:
+      "Describe the change you want directly in a GitHub issue. No forms, no new tools — just plain text where your work already lives.",
+    icon: "issue",
+  },
+  {
+    title: "2. The orchestrator routes it",
+    description:
+      "The orchestrator agent picks up your request, assesses the scope and hands it to a worker agent that owns the task.",
+    icon: "route",
+  },
+  {
+    title: "3. A worker opens a PR",
+    description:
+      "The worker investigates the code, implements the change, runs the relevant checks and opens a pull request with the result.",
+    icon: "pull-request",
+  },
+  {
+    title: "4. You review and merge",
+    description:
+      "A human reviews the pull request and merges it. Feedback on the PR loops straight back into the pipeline.",
+    icon: "review",
+  },
+]
+
 export type Feature = {
   title: string
   description: string
