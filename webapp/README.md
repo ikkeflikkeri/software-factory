@@ -27,37 +27,25 @@ The [webapp-ci](../../actions/workflows/webapp-ci.yml) workflow runs in `webapp/
 There is no separate `npm test` or `npm run typecheck` script; `npm run build` covers
 type-checking.
 
-## Vercel deployment (GitHub Actions + Vercel CLI)
+## Deployment (GitHub Pages)
 
-Deployments run in GitHub Actions with the Vercel CLI; the Vercel Git integration is no longer used.
-Two workflows deploy the app from the `webapp/` directory:
+The webapp deploys to **GitHub Pages** from GitHub Actions — no external hosting account, no
+secrets, no Vercel integration. Two workflows build the app from the `webapp/` directory:
 
-- **Preview** ([`vercel-preview.yml`](../.github/workflows/vercel-preview.yml)): on every pull
-  request touching `webapp/`, runs `vercel pull --environment=preview`, `vercel build`,
-  `vercel deploy --prebuilt`, and posts the preview URL as a comment on the PR.
-- **Production** ([`vercel-production.yml`](../.github/workflows/vercel-production.yml)): on every
-  push to `main` touching `webapp/`, runs `vercel pull --environment=production`,
-  `vercel build --prod`, `vercel deploy --prebuilt --prod`.
+- **Production** ([`webapp-pages.yml`](../.github/workflows/webapp-pages.yml)): on every push to
+  `main` touching `webapp/`, runs `npm ci` and `npm run build`, then publishes `webapp/dist` to
+  GitHub Pages. The site is served under the repository path, so the build passes
+  `--base=/<repo name>/` to Vite.
+- **Preview** ([`webapp-preview.yml`](../.github/workflows/webapp-preview.yml)): on every pull
+  request touching `webapp/`, builds the same way and uploads the output as the
+  `webapp-preview-<PR number>` workflow artifact, then comments a download link on the PR.
+  GitHub Pages does not host per-PR sites; download the artifact and serve it locally
+  (e.g. `npx serve`) to preview a PR.
 
-The workflows run the Vercel CLI from the repository root: the project's root directory is set to
-`webapp/` in the Vercel dashboard, and the CLI resolves that path relative to its working directory
-(running it inside `webapp/` would make it look for `webapp/webapp`).
+### One-time setup (repository owner)
 
-The Vercel CLI performs its own dependency install during `vercel build` (using the
-`installCommand` from `webapp/vercel.json`), so the workflows do not run `npm ci` before it.
-`webapp/vercel.json` keeps the Vite framework preset, install/build commands and output
-directory; the `.vercel/` link directory it generates locally is git-ignored and never committed.
+- **Settings → Pages**: set **Source** to **GitHub Actions**. This is the only required step;
+  there are no tokens or other secrets.
 
-### Required repository secrets
-
-These three secrets must be configured by the repository owner under
-**Settings → Secrets and variables → Actions** before the deploy workflows can run
-(no values are stored in the repository):
-
-- `VERCEL_TOKEN` — a Vercel access token
-- `VERCEL_ORG_ID` — the Vercel team/user ID
-- `VERCEL_PROJECT_ID` — the Vercel project ID
-
-The token is passed only as an environment variable / CLI flag and is never printed.
-Automatic Git deployments for this project must be disabled in the Vercel dashboard so that
-only the GitHub Actions workflows deploy it.
+The former Vercel setup (Git integration, CLI workflows, `webapp/vercel.json`) was removed;
+`npm run build` still works as before and `dist/` remains the build output.
