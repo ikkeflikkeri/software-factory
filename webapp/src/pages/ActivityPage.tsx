@@ -1,5 +1,7 @@
-import { Activity, CircleDot, GitPullRequest, GitPullRequestClosed } from "lucide-react"
+import { useState } from "react"
+import { Activity, CircleDot, GitPullRequest, GitPullRequestClosed, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { EmptyState } from "@/components/EmptyState"
 import { PageHeader } from "@/components/PageHeader"
 import { fetchActivity, relativeTime, type ActivityItem } from "@/lib/github"
@@ -37,7 +39,41 @@ function TimelineRow({ item, now }: { item: ActivityItem; now: number }) {
   )
 }
 
-export function ActivityPage() {
+function TraceForm({ onOpenTrace }: { onOpenTrace: (issueNumber: number) => void }) {
+  const [value, setValue] = useState("")
+  const trimmed = value.trim()
+  const valid = /^\d+$/.test(trimmed)
+
+  return (
+    <form
+      className="flex flex-wrap items-end gap-2 rounded-lg border border-border bg-card p-4"
+      onSubmit={(event) => {
+        event.preventDefault()
+        if (valid) onOpenTrace(Number(trimmed))
+      }}
+    >
+      <div className="flex min-w-48 flex-col gap-1">
+        <label htmlFor="trace-issue-number" className="text-xs font-medium text-muted-foreground">
+          Open a trace by issue number
+        </label>
+        <Input
+          id="trace-issue-number"
+          inputMode="numeric"
+          placeholder="e.g. 7"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          className="w-40"
+        />
+      </div>
+      <Button type="submit" size="sm" variant="outline" disabled={!valid}>
+        <Search className="size-3.5" aria-hidden="true" />
+        View trace
+      </Button>
+    </form>
+  )
+}
+
+export function ActivityPage({ onOpenTrace }: { onOpenTrace: (issueNumber: number) => void }) {
   const now = useNow()
   const activity = useAsync(() => fetchActivity(30), [])
 
@@ -47,6 +83,8 @@ export function ActivityPage() {
         title="Activity"
         description="Recent merged pull requests and closed issues."
       />
+
+      <TraceForm onOpenTrace={onOpenTrace} />
 
       {activity.state === "loading" ? (
         <section className="rounded-lg border border-border bg-card p-4" aria-busy="true" aria-label="Loading activity">

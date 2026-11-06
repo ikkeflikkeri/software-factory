@@ -1,4 +1,3 @@
-import { useState } from "react"
 import {
   Activity,
   ChevronRight,
@@ -14,6 +13,8 @@ import { PageHeader } from "@/components/PageHeader"
 import { OverviewPage } from "@/pages/OverviewPage"
 import { DeploymentsPage } from "@/pages/DeploymentsPage"
 import { ActivityPage } from "@/pages/ActivityPage"
+import { TracePage } from "@/pages/TracePage"
+import { useRoute } from "@/lib/router"
 
 const navItems: NavItem[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -58,9 +59,38 @@ function SettingsPage() {
   )
 }
 
+function NotFoundPage({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader title="Not found" description="This page does not exist." />
+      <section className="rounded-lg border border-border bg-card">
+        <EmptyState
+          icon={CircleDot}
+          title="Page not found"
+          description="The route you opened does not match any dashboard page."
+          action={
+            <Button variant="outline" size="sm" onClick={onBack}>
+              Go to overview
+            </Button>
+          }
+        />
+      </section>
+    </div>
+  )
+}
+
 function App() {
-  const [activeId, setActiveId] = useState("overview")
-  const activeItem = navItems.find((item) => item.id === activeId) ?? navItems[0]
+  const { route, navigate } = useRoute()
+
+  const activeSection =
+    route.name === "section" ? route.section : route.name === "trace" ? "activity" : "overview"
+  const activeItem = navItems.find((item) => item.id === activeSection) ?? navItems[0]
+  const topBarSection =
+    route.name === "trace"
+      ? `Trace #${route.issueNumber}`
+      : route.name === "not-found"
+        ? "Not found"
+        : activeItem.label
 
   return (
     <div className="flex min-h-svh bg-background text-foreground">
@@ -71,8 +101,8 @@ function App() {
         </div>
         <SidebarNav
           items={navItems}
-          activeId={activeId}
-          onSelect={setActiveId}
+          activeId={activeSection}
+          onSelect={(id) => navigate(`/${id}`)}
           className="px-2 py-3"
         />
         <div className="mt-auto border-t border-sidebar-border px-4 py-3 text-xs text-muted-foreground">
@@ -81,12 +111,18 @@ function App() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col pl-56">
-        <DashboardTopBar section={activeItem.label} />
+        <DashboardTopBar section={topBarSection} />
         <main className="flex flex-col gap-6 px-6 py-6">
-          {activeId === "overview" ? <OverviewPage /> : null}
-          {activeId === "deployments" ? <DeploymentsPage /> : null}
-          {activeId === "activity" ? <ActivityPage /> : null}
-          {activeId === "settings" ? <SettingsPage /> : null}
+          {route.name === "section" && route.section === "overview" ? <OverviewPage /> : null}
+          {route.name === "section" && route.section === "deployments" ? <DeploymentsPage /> : null}
+          {route.name === "section" && route.section === "activity" ? (
+            <ActivityPage onOpenTrace={(n) => navigate(`/trace/${n}`)} />
+          ) : null}
+          {route.name === "section" && route.section === "settings" ? <SettingsPage /> : null}
+          {route.name === "trace" ? (
+            <TracePage issueNumber={route.issueNumber} onBack={() => navigate("/activity")} />
+          ) : null}
+          {route.name === "not-found" ? <NotFoundPage onBack={() => navigate("/overview")} /> : null}
         </main>
       </div>
     </div>
