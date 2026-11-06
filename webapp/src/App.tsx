@@ -11,9 +11,12 @@ import { CommandPalette } from "@/components/CommandPalette"
 import { navItems } from "@/lib/nav"
 import { EmptyState } from "@/components/EmptyState"
 import { PageHeader } from "@/components/PageHeader"
+import { RouteErrorBoundary } from "@/components/RouteErrorBoundary"
 import { OverviewPage } from "@/pages/OverviewPage"
 import { DeploymentsPage } from "@/pages/DeploymentsPage"
 import { ActivityPage } from "@/pages/ActivityPage"
+import { NotFound } from "@/pages/NotFound"
+import { navigate, usePathname } from "@/lib/router"
 
 const isMac =
   typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
@@ -95,8 +98,8 @@ function App() {
         </div>
         <SidebarNav
           items={navItems}
-          activeId={activeId}
-          onSelect={setActiveId}
+          activeId={activeItem?.id ?? ""}
+          onSelect={(id) => navigate(pathFor(id))}
           className="px-2 py-3"
         />
         <div className="mt-auto border-t border-sidebar-border px-4 py-3 text-xs text-muted-foreground">
@@ -108,10 +111,27 @@ function App() {
         <DashboardTopBar section={activeItem.label} onOpenSearch={openPalette} />
         <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} onNavigate={setActiveId} />
         <main className="flex flex-col gap-6 px-6 py-6">
-          {activeId === "overview" ? <OverviewPage /> : null}
-          {activeId === "deployments" ? <DeploymentsPage /> : null}
-          {activeId === "activity" ? <ActivityPage /> : null}
-          {activeId === "settings" ? <SettingsPage /> : null}
+          {activeSection === "overview" ? (
+            <RouteErrorBoundary key={pathname}>
+              <OverviewPage />
+            </RouteErrorBoundary>
+          ) : null}
+          {activeSection === "deployments" ? (
+            <RouteErrorBoundary key={pathname}>
+              <DeploymentsPage />
+            </RouteErrorBoundary>
+          ) : null}
+          {activeSection === "activity" ? (
+            <RouteErrorBoundary key={pathname}>
+              <ActivityPage />
+            </RouteErrorBoundary>
+          ) : null}
+          {activeSection === "settings" ? (
+            <RouteErrorBoundary key={pathname}>
+              <SettingsPage />
+            </RouteErrorBoundary>
+          ) : null}
+          {activeItem === undefined ? <NotFound /> : null}
         </main>
       </div>
     </div>
