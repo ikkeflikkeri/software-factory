@@ -4,6 +4,7 @@ import {
   ChevronRight,
   CircleDot,
   LayoutDashboard,
+  LogOut,
   Menu,
   Rocket,
   Settings,
@@ -25,7 +26,9 @@ import { DeploymentsPage } from "@/pages/DeploymentsPage"
 import { ActivityPage } from "@/pages/ActivityPage"
 import { TracePage } from "@/pages/TracePage"
 import { NotFound } from "@/pages/NotFound"
+import { SignInPage } from "@/pages/SignInPage"
 import { navigate, usePathname } from "@/lib/router"
+import { useAuth } from "@/lib/useAuth"
 
 const navItems: NavItem[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -46,7 +49,19 @@ function pathFor(sectionId: string): string {
   return Object.keys(routes).find((path) => routes[path] === sectionId) ?? "/"
 }
 
-function DashboardTopBar({ section, onOpenNav }: { section: string; onOpenNav: () => void }) {
+function DashboardTopBar({
+  section,
+  onOpenNav,
+  userName,
+  userPicture,
+  onSignOut,
+}: {
+  section: string
+  onOpenNav: () => void
+  userName: string
+  userPicture: string | null
+  onSignOut: (() => void) | null
+}) {
   return (
     <header className="sticky top-0 z-10 flex h-12 items-center justify-between gap-4 border-b border-border bg-background/95 px-4 backdrop-blur md:px-6">
       <div className="flex min-w-0 items-center gap-1.5">
@@ -67,12 +82,25 @@ function DashboardTopBar({ section, onOpenNav }: { section: string; onOpenNav: (
       </div>
       <div className="flex items-center gap-3">
         <Button variant="outline" size="sm">Feedback</Button>
-        <div
-          className="flex size-6 items-center justify-center rounded-full border border-border bg-muted text-[11px] font-semibold text-muted-foreground"
-          title="ikkeflikkeri"
-        >
-          ik
-        </div>
+        {userPicture !== null ? (
+          <img
+            src={userPicture}
+            alt=""
+            className="size-6 rounded-full border border-border object-cover"
+          />
+        ) : (
+          <div className="flex size-6 items-center justify-center rounded-full border border-border bg-muted text-[11px] font-semibold text-muted-foreground">
+            {userName.slice(0, 1).toUpperCase()}
+          </div>
+        )}
+        <span className="hidden max-w-40 truncate text-[13px] font-medium sm:inline" title={userName}>
+          {userName}
+        </span>
+        {onSignOut !== null ? (
+          <Button variant="ghost" size="icon-sm" aria-label="Sign out" onClick={onSignOut}>
+            <LogOut className="size-4" aria-hidden="true" />
+          </Button>
+        ) : null}
       </div>
     </header>
   )
@@ -100,10 +128,17 @@ function App() {
   const activeSection = routes[pathname] ?? (traceIssueNumber !== null ? "activity" : undefined)
   const activeItem = navItems.find((item) => item.id === activeSection)
   const [navOpen, setNavOpen] = useState(false)
+  const { configured, session, signOut } = useAuth()
 
   function selectNav(id: string) {
     setNavOpen(false)
     navigate(pathFor(id))
+  }
+
+  // When Google sign-in is configured, signed-out visitors get the sign-in
+  // page instead of the dashboard (client-side gate, see webapp/README.md).
+  if (configured && session === null) {
+    return <SignInPage />
   }
 
   return (
@@ -156,6 +191,9 @@ function App() {
               : (activeItem?.label ?? "Not found")
           }
           onOpenNav={() => setNavOpen(true)}
+          userName={session?.user.name ?? "guest"}
+          userPicture={session?.user.picture ?? null}
+          onSignOut={configured ? signOut : null}
         />
         <main className="flex flex-col gap-6 px-4 py-6 md:px-6">
           {traceIssueNumber !== null ? (

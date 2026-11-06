@@ -92,3 +92,73 @@ describe("App routing (trace)", () => {
     expect(container.textContent).toContain("Page not found")
   })
 })
+
+describe("App auth gate", () => {
+  const CLIENT_ID = "test-client.apps.googleusercontent.com"
+
+  function b64url(json: unknown): string {
+    return btoa(JSON.stringify(json))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "")
+  }
+
+  function signIn(): void {
+    const credential = `${b64url({ alg: "RS256" })}.${b64url({
+      iss: "https://accounts.google.com",
+      aud: CLIENT_ID,
+      sub: "1234567890",
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      name: "Test User",
+      picture: "https://example.com/a.png",
+    })}.sig`
+    window.localStorage.setItem(
+      "software-factory.google-session",
+      JSON.stringify({
+        credential,
+        expiresAt: Date.now() + 3_600_000,
+        user: {
+          id: "1234567890",
+          email: "user@example.com",
+          name: "Test User",
+          picture: "https://example.com/a.png",
+        },
+      }),
+    )
+  }
+
+  afterEach(() => {
+    window.localStorage.clear()
+    vi.unstubAllEnvs()
+  })
+
+  it("shows the sign-in page instead of the dashboard when signed out", () => {
+    vi.stubEnv("VITE_GOOGLE_CLIENT_ID", CLIENT_ID)
+    window.history.replaceState(null, "", "/deployments")
+    renderApp()
+
+    expect(container.textContent).toContain("Sign in required")
+    expect(container.textContent).not.toContain("Deployments")
+  })
+
+  it("shows the dashboard and the user's name for a signed-in visitor", () => {
+    vi.stubEnv("VITE_GOOGLE_CLIENT_ID", CLIENT_ID)
+    signIn()
+    window.history.replaceState(null, "", "/deployments")
+    renderApp()
+
+    expect(container.textContent).not.toContain("Sign in required")
+    expect(container.textContent).toContain("Deployments")
+    expect(container.textContent).toContain("Test User")
+    expect(container.querySelector("button[aria-label='Sign out']")).not.toBeNull()
+  })
+
+  it("keeps the dashboard public when no client ID is configured", () => {
+    vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "")
+    window.history.replaceState(null, "", "/settings")
+    renderApp()
+
+    expect(container.textContent).not.toContain("Sign in required")
+    expect(container.textContent).toContain("Nothing to configure")
+  })
+})
