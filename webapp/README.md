@@ -13,6 +13,20 @@ npm run lint     # lint the source
 npm run preview  # preview the production build
 ```
 
+## CI checks
+
+GitHub Actions runs the webapp checks on every pull request and on every push to `main`
+that changes files under `webapp/` (`.github/workflows/webapp-ci.yml`).
+
+The [webapp-ci](../../actions/workflows/webapp-ci.yml) workflow runs in `webapp/`:
+
+1. `npm ci` — install dependencies from the lockfile
+2. `npm run lint` — lint the source
+3. `npm run build` — type-check (via `tsc -b`) and build for production
+
+There is no separate `npm test` or `npm run typecheck` script; `npm run build` covers
+type-checking.
+
 ## Vercel deployment (Git integration)
 
 Deployments use **Vercel's Git integration**: Vercel watches this repository and deploys it

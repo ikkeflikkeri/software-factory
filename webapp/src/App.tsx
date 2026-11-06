@@ -19,6 +19,8 @@ function App() {
           <h1>Get started</h1>
           <p>
             Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
+            <br />
+            CI checks pass — preview deployed by Vercel
           </p>
         </div>
         <button
