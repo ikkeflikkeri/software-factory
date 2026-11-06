@@ -1,16 +1,13 @@
 import { useEffect, useState } from "react"
 import {
-  Activity,
   ChevronRight,
   CircleDot,
-  LayoutDashboard,
-  Rocket,
   Search,
   Settings,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CommandPalette } from "@/components/CommandPalette"
-import { SidebarNav, type NavItem } from "@/components/SidebarNav"
+import { SidebarNav } from "@/components/SidebarNav"
 import { EmptyState } from "@/components/EmptyState"
 import { PageHeader } from "@/components/PageHeader"
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary"
@@ -19,13 +16,7 @@ import { DeploymentsPage } from "@/pages/DeploymentsPage"
 import { ActivityPage } from "@/pages/ActivityPage"
 import { NotFound } from "@/pages/NotFound"
 import { navigate, usePathname } from "@/lib/router"
-
-const navItems: NavItem[] = [
-  { id: "overview", label: "Overview", icon: LayoutDashboard },
-  { id: "deployments", label: "Deployments", icon: Rocket },
-  { id: "activity", label: "Activity", icon: Activity },
-  { id: "settings", label: "Settings", icon: Settings },
-]
+import { navItems } from "@/lib/nav"
 
 /** Maps app paths to the nav section they belong to. */
 const routes: Record<string, string> = {
