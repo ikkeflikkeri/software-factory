@@ -27,23 +27,25 @@ The [webapp-ci](../../actions/workflows/webapp-ci.yml) workflow runs in `webapp/
 There is no separate `npm test` or `npm run typecheck` script; `npm run build` covers
 type-checking.
 
-## Vercel deployment (Git integration)
+## Deployment (GitHub Pages)
 
-Deployments use **Vercel's Git integration**: Vercel watches this repository and deploys it
-automatically. No GitHub Actions workflow and no `VERCEL_TOKEN` secret are involved.
+The webapp deploys to **GitHub Pages** from GitHub Actions — no external hosting account, no
+secrets, no Vercel integration. Two workflows build the app from the `webapp/` directory:
 
-- **Pull requests** get automatic preview deployments from Vercel.
-- **Every merge to `main`** triggers a production deployment.
-- The Vercel project root is the `webapp/` directory; `webapp/vercel.json` pins the install command,
-  build command (`npm run build`) and output directory (`dist`). No Vercel token, org ID or project
-  ID is stored in the repository.
+- **Production** ([`webapp-pages.yml`](../.github/workflows/webapp-pages.yml)): on every push to
+  `main` touching `webapp/`, runs `npm ci` and `npm run build`, then publishes `webapp/dist` to
+  GitHub Pages. The site is served under the repository path, so the build passes
+  `--base=/<repo name>/` to Vite.
+- **Preview** ([`webapp-preview.yml`](../.github/workflows/webapp-preview.yml)): on every pull
+  request touching `webapp/`, builds the same way and uploads the output as the
+  `webapp-preview-<PR number>` workflow artifact, then comments a download link on the PR.
+  GitHub Pages does not host per-PR sites; download the artifact and serve it locally
+  (e.g. `npx serve`) to preview a PR.
 
-### One-time owner setup (Vercel dashboard)
+### One-time setup (repository owner)
 
-1. In Vercel, choose **Add New → Project** and import the `ikkeflikkeri/software-factory` repository
-   (the Vercel GitHub App must have access to it).
-2. Under **Build & Output Settings**, set **Root Directory** to `webapp/` so the build runs from that
-   folder. The framework preset **Vite** is detected automatically; leave the install command, build
-   command (`npm run build`) and output directory (`dist`) as configured in `webapp/vercel.json`.
-3. Deploy. From then on, every PR gets a preview deployment and every merge to `main` deploys to
-   production automatically.
+- **Settings → Pages**: set **Source** to **GitHub Actions**. This is the only required step;
+  there are no tokens or other secrets.
+
+The former Vercel setup (Git integration, CLI workflows, `webapp/vercel.json`) was removed;
+`npm run build` still works as before and `dist/` remains the build output.
