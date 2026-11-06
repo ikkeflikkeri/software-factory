@@ -67,6 +67,58 @@ secrets, no Vercel integration. Two workflows build the app from the `webapp/` d
 The former Vercel setup (Git integration, CLI workflows, `webapp/vercel.json`) was removed;
 `npm run build` still works as before and `dist/` remains the build output.
 
+## Google sign-in
+
+The dashboard is restricted to signed-in users. Sign-in uses Google Identity
+Services (GIS) with the ID-token credential model: the browser renders the
+official "Sign in with Google" button, Google returns a JWT ID token, and the
+app keeps it in `localStorage` until it expires. **No client secret is used**
+— a browser app is a public client, so only the public client ID reaches the
+browser.
+
+### Setup (repository owner)
+
+1. In the [Google Cloud Console](https://console.cloud.google.com/) create (or
+   pick) a project and configure the **OAuth consent screen** (External, with
+   your Google account as a test user).
+2. Under **APIs & Services → Credentials** create an **OAuth 2.0 Client ID** of
+   type **Web application**.
+3. Add every origin the app is served from under **Authorized JavaScript
+   origins**, e.g. `http://localhost:5173` (local dev) and
+   `https://<owner>.github.io` (GitHub Pages). No redirect URIs are needed.
+4. Copy the client ID into `webapp/.env` (see `.env.example`) for local
+   development:
+
+   ```
+   VITE_GOOGLE_CLIENT_ID=<your-client-id>.apps.googleusercontent.com
+   ```
+
+5. For the deployed build, expose the same variable in the hosting
+   environment: with Vercel, add it to the project's environment variables;
+   with GitHub Pages, add a `VITE_GOOGLE_CLIENT_ID` secret to the repository
+   and pass it to the build without printing it.
+
+Never commit `.env` or paste the client ID into issues, PRs or logs — the
+value is public in the browser, but keeping it out of the repo keeps deploys
+configurable per environment. (A client secret must never be created for this
+flow; if your credential has one, do not expose it to the browser.)
+
+### How the gate works
+
+- When `VITE_GOOGLE_CLIENT_ID` is **set**, signed-out visitors see the
+  sign-in page instead of any dashboard route. The signed-in user's name and
+  avatar appear in the top bar with a sign-out button.
+- When it is **unset** (no sign-in configured), the dashboard stays publicly
+  accessible — the feature is off, not locked.
+- The session is the ID token plus display fields in `localStorage`
+  (`software-factory.google-session`); it is dropped when its `exp` claim
+  passes, and a failed sign-in (script load error or rejected token) shows an
+  error message instead of crashing.
+- Trade-off: this is a **client-side gate** — it restricts the UI, not the
+  static files themselves (the dashboard only reads public GitHub data, so no
+  private data is exposed). Enforcing access at the server would require a
+  backend or host-level auth, out of scope for a static SPA.
+
 ## SPA routing on static hosts
 
 The dashboard uses client-side routes (e.g. `/deployments`). Static hosts must serve
