@@ -29,7 +29,7 @@ function StatCard({ label, value, icon: Icon }: { label: string; value: string; 
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-border bg-card">
+    <section className="min-w-0 rounded-lg border border-border bg-card">
       <header className="flex h-10 items-center border-b border-border px-4 text-[13px] font-medium">
         {title}
       </header>
@@ -71,7 +71,7 @@ const RATE_LIMIT_HINT =
 function ActivityRow({ item, now }: { item: ActivityItem; now: number }) {
   const Icon = item.kind === "pr" ? GitPullRequest : GitPullRequestClosed
   return (
-    <li className="flex items-center justify-between gap-4 px-4 py-2.5 text-[13px]">
+    <li className="flex min-w-0 items-center justify-between gap-4 px-4 py-2.5 text-[13px]">
       <a
         href={item.url}
         target="_blank"
@@ -156,7 +156,7 @@ function DeploymentsPanel({ state, now }: { state: ReturnType<typeof useAsync<De
         ) : (
           <ul className="divide-y divide-border/60">
             {state.data.map((run) => (
-              <li key={run.id} className="flex items-center justify-between gap-4 px-4 py-2.5 text-[13px]">
+              <li key={run.id} className="flex min-w-0 items-center justify-between gap-4 px-4 py-2.5 text-[13px]">
                 <a
                   href={run.url}
                   target="_blank"
