@@ -36,9 +36,6 @@ jobs:
 
       - run: npm ci
       - run: npm run build -- --base=/${{ github.event.repository.name }}/
-      # GitHub Pages has no SPA rewrite: serve the app shell on 404 so deep
-      # links like /software-factory/trace/7 boot the client-side router.
-      - run: cp dist/index.html dist/404.html
 
       - uses: actions/configure-pages@v5
         with:

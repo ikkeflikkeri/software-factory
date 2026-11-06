@@ -1,32 +1,35 @@
-import { afterEach, describe, expect, it, vi } from "vitest"
-import { basePath, parsePath } from "./router"
+import { describe, expect, it, vi } from "vitest"
+import { href, normalizePath } from "./router"
 
-describe("parsePath", () => {
-  afterEach(() => {
-    vi.unstubAllEnvs()
+describe("normalizePath", () => {
+  it("keeps known root-level paths as-is", () => {
+    expect(normalizePath("/")).toBe("/")
+    expect(normalizePath("/deployments")).toBe("/deployments")
   })
 
-  it("resolves sections and the default route", () => {
-    expect(parsePath("/")).toEqual({ name: "section", section: "overview" })
-    expect(parsePath("/activity")).toEqual({ name: "section", section: "activity" })
-    expect(parsePath("/deployments/")).toEqual({ name: "section", section: "deployments" })
+  it("collapses trailing slashes", () => {
+    expect(normalizePath("/deployments/")).toBe("/deployments")
   })
 
-  it("parses trace routes with an issue number", () => {
-    expect(parsePath("/trace/7")).toEqual({ name: "trace", issueNumber: 7 })
-    expect(parsePath("/trace/042")).toEqual({ name: "trace", issueNumber: 42 })
+  it("marks unknown paths as not found by leaving them intact", () => {
+    expect(normalizePath("/does-not-exist")).toBe("/does-not-exist")
   })
+})
 
-  it("rejects malformed trace paths and unknown sections", () => {
-    expect(parsePath("/trace/abc")).toEqual({ name: "not-found" })
-    expect(parsePath("/trace/")).toEqual({ name: "not-found" })
-    expect(parsePath("/nope")).toEqual({ name: "not-found" })
-  })
-
+describe("normalizePath with a base path (GitHub Pages)", () => {
   it("strips the deployment base path", () => {
     vi.stubEnv("BASE_URL", "/software-factory/")
-    expect(basePath()).toBe("/software-factory")
-    expect(parsePath("/software-factory/trace/7")).toEqual({ name: "trace", issueNumber: 7 })
-    expect(parsePath("/software-factory/")).toEqual({ name: "section", section: "overview" })
+    expect(normalizePath("/software-factory/deployments")).toBe("/deployments")
+    expect(normalizePath("/software-factory/")).toBe("/")
+    vi.unstubAllEnvs()
+  })
+})
+
+describe("href", () => {
+  it("links back to the base-rooted overview", () => {
+    expect(href("/")).toBe("/")
+    vi.stubEnv("BASE_URL", "/software-factory/")
+    expect(href("/")).toBe("/software-factory/")
+    vi.unstubAllEnvs()
   })
 })

@@ -10,11 +10,12 @@ import { Button } from "@/components/ui/button"
 import { SidebarNav, type NavItem } from "@/components/SidebarNav"
 import { EmptyState } from "@/components/EmptyState"
 import { PageHeader } from "@/components/PageHeader"
+import { RouteErrorBoundary } from "@/components/RouteErrorBoundary"
 import { OverviewPage } from "@/pages/OverviewPage"
 import { DeploymentsPage } from "@/pages/DeploymentsPage"
 import { ActivityPage } from "@/pages/ActivityPage"
-import { TracePage } from "@/pages/TracePage"
-import { useRoute } from "@/lib/router"
+import { NotFound } from "@/pages/NotFound"
+import { navigate, usePathname } from "@/lib/router"
 
 const navItems: NavItem[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -22,6 +23,18 @@ const navItems: NavItem[] = [
   { id: "activity", label: "Activity", icon: Activity },
   { id: "settings", label: "Settings", icon: Settings },
 ]
+
+/** Maps app paths to the nav section they belong to. */
+const routes: Record<string, string> = {
+  "/": "overview",
+  "/deployments": "deployments",
+  "/activity": "activity",
+  "/settings": "settings",
+}
+
+function pathFor(sectionId: string): string {
+  return Object.keys(routes).find((path) => routes[path] === sectionId) ?? "/"
+}
 
 function DashboardTopBar({ section }: { section: string }) {
   return (
@@ -59,38 +72,10 @@ function SettingsPage() {
   )
 }
 
-function NotFoundPage({ onBack }: { onBack: () => void }) {
-  return (
-    <div className="flex flex-col gap-6">
-      <PageHeader title="Not found" description="This page does not exist." />
-      <section className="rounded-lg border border-border bg-card">
-        <EmptyState
-          icon={CircleDot}
-          title="Page not found"
-          description="The route you opened does not match any dashboard page."
-          action={
-            <Button variant="outline" size="sm" onClick={onBack}>
-              Go to overview
-            </Button>
-          }
-        />
-      </section>
-    </div>
-  )
-}
-
 function App() {
-  const { route, navigate } = useRoute()
-
-  const activeSection =
-    route.name === "section" ? route.section : route.name === "trace" ? "activity" : "overview"
-  const activeItem = navItems.find((item) => item.id === activeSection) ?? navItems[0]
-  const topBarSection =
-    route.name === "trace"
-      ? `Trace #${route.issueNumber}`
-      : route.name === "not-found"
-        ? "Not found"
-        : activeItem.label
+  const pathname = usePathname()
+  const activeSection = routes[pathname]
+  const activeItem = navItems.find((item) => item.id === activeSection)
 
   return (
     <div className="flex min-h-svh bg-background text-foreground">
@@ -101,8 +86,8 @@ function App() {
         </div>
         <SidebarNav
           items={navItems}
-          activeId={activeSection}
-          onSelect={(id) => navigate(`/${id}`)}
+          activeId={activeItem?.id ?? ""}
+          onSelect={(id) => navigate(pathFor(id))}
           className="px-2 py-3"
         />
         <div className="mt-auto border-t border-sidebar-border px-4 py-3 text-xs text-muted-foreground">
@@ -111,18 +96,29 @@ function App() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col pl-56">
-        <DashboardTopBar section={topBarSection} />
+        <DashboardTopBar section={activeItem?.label ?? "Not found"} />
         <main className="flex flex-col gap-6 px-6 py-6">
-          {route.name === "section" && route.section === "overview" ? <OverviewPage /> : null}
-          {route.name === "section" && route.section === "deployments" ? <DeploymentsPage /> : null}
-          {route.name === "section" && route.section === "activity" ? (
-            <ActivityPage onOpenTrace={(n) => navigate(`/trace/${n}`)} />
+          {activeSection === "overview" ? (
+            <RouteErrorBoundary key={pathname}>
+              <OverviewPage />
+            </RouteErrorBoundary>
           ) : null}
-          {route.name === "section" && route.section === "settings" ? <SettingsPage /> : null}
-          {route.name === "trace" ? (
-            <TracePage issueNumber={route.issueNumber} onBack={() => navigate("/activity")} />
+          {activeSection === "deployments" ? (
+            <RouteErrorBoundary key={pathname}>
+              <DeploymentsPage />
+            </RouteErrorBoundary>
           ) : null}
-          {route.name === "not-found" ? <NotFoundPage onBack={() => navigate("/overview")} /> : null}
+          {activeSection === "activity" ? (
+            <RouteErrorBoundary key={pathname}>
+              <ActivityPage />
+            </RouteErrorBoundary>
+          ) : null}
+          {activeSection === "settings" ? (
+            <RouteErrorBoundary key={pathname}>
+              <SettingsPage />
+            </RouteErrorBoundary>
+          ) : null}
+          {activeItem === undefined ? <NotFound /> : null}
         </main>
       </div>
     </div>

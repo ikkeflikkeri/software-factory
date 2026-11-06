@@ -1,56 +1,50 @@
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 
 /**
- * Minimal history-based routing. The app is deployed to GitHub Pages, so
- * paths are resolved relative to the Vite base and deep links fall back to
- * index.html via a 404.html copy.
+ * Base path the app is served from ("" when hosted at the domain root,
+ * "/<repo name>" on GitHub Pages). Derived from the Vite `base` option.
  */
-
-export type Route =
-  | { name: "section"; section: string }
-  | { name: "trace"; issueNumber: number }
-  | { name: "not-found" }
-
-export const SECTION_IDS = ["overview", "deployments", "activity", "settings"] as const
-
-export function basePath(): string {
+function basePath(): string {
   const base = import.meta.env.BASE_URL ?? "/"
   return base.endsWith("/") ? base.slice(0, -1) : base
 }
 
-export function parsePath(pathname: string): Route {
+/** Strip the deployment base path and trailing slashes from a pathname. */
+export function normalizePath(pathname: string): string {
+  let path = pathname
   const base = basePath()
-  const rel = base && pathname.startsWith(base) ? pathname.slice(base.length) : pathname
-  const parts = rel.split("/").filter(Boolean)
-  if (parts.length === 0) return { name: "section", section: "overview" }
-  if (parts[0] === "trace") {
-    if (parts[1] !== undefined && /^\d+$/.test(parts[1])) {
-      return { name: "trace", issueNumber: Number(parts[1]) }
-    }
-    return { name: "not-found" }
+  if (base && path.startsWith(base)) {
+    path = path.slice(base.length)
   }
-  if ((SECTION_IDS as readonly string[]).includes(parts[0])) {
-    return { name: "section", section: parts[0] }
+  if (!path.startsWith("/")) {
+    path = `/${path}`
   }
-  return { name: "not-found" }
+  if (path.length > 1 && path.endsWith("/")) {
+    path = path.slice(0, -1)
+  }
+  return path
 }
 
-export function useRoute(): { route: Route; navigate: (path: string) => void } {
-  const [route, setRoute] = useState<Route>(() =>
-    typeof window === "undefined" ? { name: "section", section: "overview" } : parsePath(window.location.pathname)
-  )
+/** Absolute href for an app-internal path, including the base path. */
+export function href(to: string): string {
+  return `${basePath()}${to}`
+}
+
+/** Subscribe to location changes (popstate) and expose the normalized path. */
+export function usePathname(): string {
+  const [pathname, setPathname] = useState(() => normalizePath(window.location.pathname))
 
   useEffect(() => {
-    const onPopState = () => setRoute(parsePath(window.location.pathname))
+    const onPopState = () => setPathname(normalizePath(window.location.pathname))
     window.addEventListener("popstate", onPopState)
     return () => window.removeEventListener("popstate", onPopState)
   }, [])
 
-  const navigate = useCallback((path: string) => {
-    const url = path.startsWith("http") ? path : `${basePath()}${path}`
-    window.history.pushState(null, "", url)
-    setRoute(parsePath(window.location.pathname))
-  }, [])
+  return pathname
+}
 
-  return { route, navigate }
+/** Navigate to an app-internal path without a full page reload. */
+export function navigate(to: string): void {
+  window.history.pushState(null, "", href(to))
+  window.dispatchEvent(new PopStateEvent("popstate"))
 }

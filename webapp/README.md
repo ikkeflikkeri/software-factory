@@ -39,10 +39,10 @@ The [webapp-ci](../../actions/workflows/webapp-ci.yml) workflow runs in `webapp/
 
 1. `npm ci` — install dependencies from the lockfile
 2. `npm run lint` — lint the source
-3. `npm run build` — type-check (via `tsc -b`) and build for production
+3. `npm test` — run the vitest suites
+4. `npm run build` — type-check (via `tsc -b`) and build for production
 
-There is no separate `npm test` or `npm run typecheck` script; `npm run build` covers
-type-checking.
+`npm run build` covers type-checking; `npm test` covers the unit and component tests.
 
 ## Deployment (GitHub Pages)
 
@@ -66,3 +66,25 @@ secrets, no Vercel integration. Two workflows build the app from the `webapp/` d
 
 The former Vercel setup (Git integration, CLI workflows, `webapp/vercel.json`) was removed;
 `npm run build` still works as before and `dist/` remains the build output.
+
+## SPA routing on static hosts
+
+The dashboard uses client-side routes (e.g. `/deployments`). Static hosts must serve
+`index.html` for unknown paths so deep links work on reload; otherwise the app only works
+when entering through the root URL.
+
+- **GitHub Pages** cannot rewrite URLs, so the `postbuild` script copies `dist/index.html`
+  to `dist/404.html`. GitHub Pages serves `404.html` (with a 200-level body) for unknown
+  paths, the app boots, and the router shows the custom 404 page for genuinely unknown
+  routes. This requires no extra setup and is included in every build (Pages and preview
+  artifacts both run `npm run build`).
+- **Vercel** (if used again): add a `webapp/vercel.json` with
+  `{ "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }` so every path is
+  handled by the app instead of the host's 404.
+
+## Testing
+
+```sh
+cd webapp
+npm test    # run vitest suites (routing, error boundary, pages, lib helpers)
+```
