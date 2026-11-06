@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import {
+  Activity,
   ChevronRight,
   CircleDot,
+  LayoutDashboard,
+  Rocket,
   Search,
   Settings,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { SidebarNav } from "@/components/SidebarNav"
 import { CommandPalette } from "@/components/CommandPalette"
-import { navItems } from "@/lib/nav"
+import { SidebarNav, type NavItem } from "@/components/SidebarNav"
 import { EmptyState } from "@/components/EmptyState"
 import { PageHeader } from "@/components/PageHeader"
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary"
@@ -17,6 +19,25 @@ import { DeploymentsPage } from "@/pages/DeploymentsPage"
 import { ActivityPage } from "@/pages/ActivityPage"
 import { NotFound } from "@/pages/NotFound"
 import { navigate, usePathname } from "@/lib/router"
+
+const navItems: NavItem[] = [
+  { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "deployments", label: "Deployments", icon: Rocket },
+  { id: "activity", label: "Activity", icon: Activity },
+  { id: "settings", label: "Settings", icon: Settings },
+]
+
+/** Maps app paths to the nav section they belong to. */
+const routes: Record<string, string> = {
+  "/": "overview",
+  "/deployments": "deployments",
+  "/activity": "activity",
+  "/settings": "settings",
+}
+
+function pathFor(sectionId: string): string {
+  return Object.keys(routes).find((path) => routes[path] === sectionId) ?? "/"
+}
 
 const isMac =
   typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
@@ -72,9 +93,10 @@ function SettingsPage() {
 }
 
 function App() {
-  const [activeId, setActiveId] = useState("overview")
+  const pathname = usePathname()
+  const activeSection = routes[pathname]
+  const activeItem = navItems.find((item) => item.id === activeSection)
   const [paletteOpen, setPaletteOpen] = useState(false)
-  const activeItem = navItems.find((item) => item.id === activeId) ?? navItems[0]
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -86,8 +108,6 @@ function App() {
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [])
-
-  const openPalette = useCallback(() => setPaletteOpen(true), [])
 
   return (
     <div className="flex min-h-svh bg-background text-foreground">
@@ -108,8 +128,15 @@ function App() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col pl-56">
-        <DashboardTopBar section={activeItem.label} onOpenSearch={openPalette} />
-        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} onNavigate={setActiveId} />
+        <DashboardTopBar
+          section={activeItem?.label ?? "Not found"}
+          onOpenSearch={() => setPaletteOpen(true)}
+        />
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          onNavigate={(id) => navigate(pathFor(id))}
+        />
         <main className="flex flex-col gap-6 px-6 py-6">
           {activeSection === "overview" ? (
             <RouteErrorBoundary key={pathname}>
