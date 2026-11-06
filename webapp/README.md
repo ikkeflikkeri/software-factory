@@ -2,6 +2,23 @@
 
 Vite + React + TypeScript webapp scaffolded from the official `react-ts` template.
 
+## UI components (shadcn/ui + Tailwind CSS)
+
+The app uses [shadcn/ui](https://ui.shadcn.com) with Tailwind CSS v4, installed via the
+[official Vite guide](https://ui.shadcn.com/docs/installation/vite). Configuration lives in
+`components.json`, the `@/` import alias maps to `src/`, the shared `cn` helper is in
+`src/lib/utils.ts`, and generated components live in `src/components/ui/` (currently
+`button`, `card` and `input`).
+
+To add more components:
+
+```sh
+cd webapp
+npx shadcn@latest add <component>   # e.g. npx shadcn@latest add dialog
+```
+
+Browse available components at <https://ui.shadcn.com/docs/components>.
+
 ## Run
 
 ```sh
