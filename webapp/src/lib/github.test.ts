@@ -4,8 +4,13 @@ import {
   clearGitHubCache,
   deploymentStatus,
   fetchDeployments,
+  fetchIssueTrace,
   fetchOverviewStats,
   formatDuration,
+  GitHubApiError,
+  linkedPrNumbersFromTimeline,
+  matchDeploymentRun,
+  mergeLinkedPrNumbers,
   relativeTime,
   runDurationMs,
   toDeploymentRun,
@@ -159,5 +164,118 @@ describe("fetchDeployments", () => {
   it("throws on API errors so pages can show the error state", async () => {
     vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response("rate limited", { status: 403 }))))
     await expect(fetchDeployments()).rejects.toThrow("403")
+  })
+})
+
+describe("issue trace", () => {
+  const issue = {
+    number: 7,
+    title: "Add feature",
+    html_url: "https://github.com/ikkeflikkeri/software-factory/issues/7",
+    state: "closed",
+    created_at: "2026-11-01T10:00:00Z",
+    closed_at: "2026-11-03T10:00:00Z",
+    user: { login: "ikkeflikkeri" },
+  }
+  const pr = {
+    number: 8,
+    title: "Fix #7",
+    html_url: "https://github.com/ikkeflikkeri/software-factory/pull/8",
+    state: "closed",
+    created_at: "2026-11-02T10:00:00Z",
+    merged_at: "2026-11-03T09:00:00Z",
+    merge_commit_sha: "abcdef1234567890",
+    user: { login: "ikkeflikkeri-agent" },
+  }
+  const timeline = [
+    {
+      event: "cross-referenced",
+      source: { issue: { ...pr, pull_request: {} } },
+    },
+    {
+      event: "cross-referenced",
+      source: { issue: { number: 9, title: "other", html_url: "u", state: "open", created_at: "2026-11-02T11:00:00Z", closed_at: null } },
+    },
+  ]
+  const search = { total_count: 1, items: [{ ...pr, pull_request: {} }] }
+  const reviews = [
+    { id: 1, state: "CHANGES_REQUESTED", submitted_at: "2026-11-02T12:00:00Z", html_url: "https://github.com/ikkeflikkeri/software-factory/pull/8#pullrequestreview-1", user: { login: "ikkeflikkeri" } },
+    { id: 2, state: "APPROVED", submitted_at: "2026-11-03T08:00:00Z", html_url: "https://github.com/ikkeflikkeri/software-factory/pull/8#pullrequestreview-2", user: { login: "ikkeflikkeri" } },
+  ]
+  const runs = { workflow_runs: [makeRun({ head_sha: "abcdef1234567890" })] }
+
+  function mockTraceFetch() {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input)
+      let body: unknown
+      let status = 200
+      if (url.includes("/pulls/8/reviews")) body = reviews
+      else if (url.includes("/pulls/8")) body = pr
+      else if (url.includes("/pulls/")) {
+        body = {}
+        status = 404 // timeline candidates that are issues, not PRs
+      }
+      else if (url.includes("/issues/7/timeline")) body = timeline
+      else if (url.includes("/issues/7")) body = issue
+      else if (url.includes("/search/issues")) body = search
+      else if (url.includes("webapp-pages.yml/runs")) body = runs
+      else body = {}
+      return Promise.resolve(new Response(JSON.stringify(body), { status }))
+    })
+    vi.stubGlobal("fetch", fetchMock)
+    return fetchMock
+  }
+
+  it("assembles issue, PR, reviews and matched deployment", async () => {
+    mockTraceFetch()
+    const trace = await fetchIssueTrace(7)
+
+    expect(trace.issue).toMatchObject({ number: 7, state: "closed", author: "ikkeflikkeri" })
+    expect(trace.pullRequests).toHaveLength(1)
+    const tracePr = trace.pullRequests[0]
+    expect(tracePr.mergedAt).toBe("2026-11-03T09:00:00Z")
+    expect(tracePr.reviews.map((r) => r.state)).toEqual(["CHANGES_REQUESTED", "APPROVED"])
+    expect(tracePr.deployment).toMatchObject({ id: 123, status: "success" })
+  })
+
+  it("serves a second trace call from cache", async () => {
+    const fetchMock = mockTraceFetch()
+    await fetchIssueTrace(7)
+    await fetchIssueTrace(7)
+    // issue + timeline + search + pr + reviews + 2 skipped candidate calls + runs
+    expect(fetchMock).toHaveBeenCalledTimes(8)
+  })
+
+  it("throws a typed error for a missing issue", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response("nope", { status: 404 }))))
+    const error = await fetchIssueTrace(999).catch((err: unknown) => err)
+    expect(error).toBeInstanceOf(GitHubApiError)
+    expect((error as GitHubApiError).status).toBe(404)
+  })
+})
+
+describe("linkedPrNumbersFromTimeline / mergeLinkedPrNumbers", () => {
+  it("keeps every cross-referenced source, ignoring other events", () => {
+    const numbers = linkedPrNumbersFromTimeline([
+      { event: "cross-referenced", source: { issue: { number: 8 } } },
+      { event: "closed", source: { issue: { number: 10 } } },
+    ])
+    expect(numbers).toEqual([8])
+  })
+
+  it("unions and sorts numbers from both sources", () => {
+    expect(mergeLinkedPrNumbers([12], [{ number: 5, pull_request: {} }, { number: 12, pull_request: {} }])).toEqual([5, 12])
+  })
+})
+
+describe("matchDeploymentRun", () => {
+  it("matches a run by merge commit sha", () => {
+    const run = matchDeploymentRun([makeRun({ head_sha: "aaa" }), makeRun({ id: 9, head_sha: "bbb" })], "bbb")
+    expect(run).toMatchObject({ id: 9, commitSha: "bbb" })
+  })
+
+  it("returns null without a merge commit or match", () => {
+    expect(matchDeploymentRun([makeRun()], null)).toBeNull()
+    expect(matchDeploymentRun([makeRun({ head_sha: "aaa" })], "bbb")).toBeNull()
   })
 })

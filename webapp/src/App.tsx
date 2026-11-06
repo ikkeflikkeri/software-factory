@@ -23,6 +23,7 @@ import { RouteErrorBoundary } from "@/components/RouteErrorBoundary"
 import { OverviewPage } from "@/pages/OverviewPage"
 import { DeploymentsPage } from "@/pages/DeploymentsPage"
 import { ActivityPage } from "@/pages/ActivityPage"
+import { TracePage } from "@/pages/TracePage"
 import { NotFound } from "@/pages/NotFound"
 import { navigate, usePathname } from "@/lib/router"
 
@@ -94,7 +95,9 @@ function SettingsPage() {
 
 function App() {
   const pathname = usePathname()
-  const activeSection = routes[pathname]
+  const traceMatch = pathname.match(/^\/trace\/(\d+)$/)
+  const traceIssueNumber = traceMatch ? Number(traceMatch[1]) : null
+  const activeSection = routes[pathname] ?? (traceIssueNumber !== null ? "activity" : undefined)
   const activeItem = navItems.find((item) => item.id === activeSection)
   const [navOpen, setNavOpen] = useState(false)
 
@@ -147,10 +150,19 @@ function App() {
 
       <div className="flex min-w-0 flex-1 flex-col md:pl-56">
         <DashboardTopBar
-          section={activeItem?.label ?? "Not found"}
+          section={
+            traceIssueNumber !== null
+              ? `Trace #${traceIssueNumber}`
+              : (activeItem?.label ?? "Not found")
+          }
           onOpenNav={() => setNavOpen(true)}
         />
         <main className="flex flex-col gap-6 px-4 py-6 md:px-6">
+          {traceIssueNumber !== null ? (
+            <RouteErrorBoundary key={pathname}>
+              <TracePage issueNumber={traceIssueNumber} />
+            </RouteErrorBoundary>
+          ) : null}
           {activeSection === "overview" ? (
             <RouteErrorBoundary key={pathname}>
               <OverviewPage />
@@ -171,7 +183,7 @@ function App() {
               <SettingsPage />
             </RouteErrorBoundary>
           ) : null}
-          {activeItem === undefined ? <NotFound /> : null}
+          {activeItem === undefined && traceIssueNumber === null ? <NotFound /> : null}
         </main>
       </div>
     </div>

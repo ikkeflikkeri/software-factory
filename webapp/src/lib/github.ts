@@ -58,17 +58,34 @@ function writeCache(key: string, data: unknown, now: number) {
 export function clearGitHubCache() {
   memoryCache.clear()
   try {
-    getStorage()?.removeItem(CACHE_KEY_STATS)
-    getStorage()?.removeItem(CACHE_KEY_ACTIVITY)
-    getStorage()?.removeItem(CACHE_KEY_DEPLOYMENTS)
+    const storage = getStorage()
+    if (!storage) return
+    for (const key of Object.keys(storage)) {
+      if (key.startsWith(CACHE_KEY_PREFIX)) storage.removeItem(key)
+    }
   } catch {
     // Ignore.
   }
 }
 
-const CACHE_KEY_STATS = "dashboard-overview"
-const CACHE_KEY_ACTIVITY = "dashboard-activity"
-const CACHE_KEY_DEPLOYMENTS = "dashboard-deployments"
+const CACHE_KEY_PREFIX = "dsh-dashboard:"
+const cacheKey = (name: string) => `${CACHE_KEY_PREFIX}${name}`
+const CACHE_KEY_STATS = cacheKey("overview")
+const CACHE_KEY_ACTIVITY = cacheKey("activity")
+const CACHE_KEY_DEPLOYMENTS = cacheKey("deployments")
+
+/** Typed GitHub API error so callers can react to specific statuses (e.g. 404). */
+export class GitHubApiError extends Error {
+  readonly status: number
+  readonly url: string
+
+  constructor(status: number, url: string) {
+    super(`GitHub API request failed: ${status} for ${url}`)
+    this.name = "GitHubApiError"
+    this.status = status
+    this.url = url
+  }
+}
 
 async function fetchJson(url: string): Promise<unknown> {
   const response = await fetch(url, {
@@ -76,7 +93,7 @@ async function fetchJson(url: string): Promise<unknown> {
     signal: AbortSignal.timeout(10_000),
   })
   if (!response.ok) {
-    throw new Error(`GitHub API request failed: ${response.status} for ${url}`)
+    throw new GitHubApiError(response.status, url)
   }
   return response.json()
 }
@@ -268,4 +285,218 @@ export async function fetchDeployments(limit = 15, now = Date.now()): Promise<De
   const runs = (data.workflow_runs ?? []).slice(0, limit).map((run) => toDeploymentRun(run, null))
   writeCache(CACHE_KEY_DEPLOYMENTS, runs, now)
   return runs
+}
+
+// ---------------------------------------------------------------------------
+// Issue trace (issue -> PRs -> reviews -> merge -> Pages deployment)
+// ---------------------------------------------------------------------------
+
+const TRACE_CACHE_KEY = cacheKey("trace")
+
+export type TraceIssue = {
+  number: number
+  title: string
+  url: string
+  state: "open" | "closed"
+  openedAt: string
+  closedAt: string | null
+  author: string | null
+}
+
+export type TraceReview = {
+  id: number
+  author: string | null
+  state: string
+  submittedAt: string
+  url: string
+}
+
+export type TracePullRequest = {
+  number: number
+  title: string
+  url: string
+  state: "open" | "closed"
+  mergedAt: string | null
+  mergeCommitSha: string | null
+  openedAt: string
+  author: string | null
+  reviews: TraceReview[]
+  /** Pages workflow run matching the merge commit, when one exists. */
+  deployment: DeploymentRun | null
+}
+
+export type IssueTrace = {
+  issue: TraceIssue
+  pullRequests: TracePullRequest[]
+}
+
+type RawIssueLike = {
+  number: number
+  title?: string
+  html_url?: string
+  state?: string
+  created_at?: string
+  closed_at?: string | null
+  user?: { login: string } | null
+  pull_request?: unknown
+}
+
+type RawPullRequest = {
+  number: number
+  title: string
+  html_url: string
+  state: string
+  created_at: string
+  merged_at: string | null
+  merge_commit_sha: string | null
+  user?: { login: string } | null
+}
+
+type RawReview = {
+  id: number
+  state: string
+  submitted_at: string | null
+  html_url: string
+  user?: { login: string } | null
+}
+
+type RawTimelineEvent = {
+  event?: string
+  source?: { issue?: RawIssueLike }
+}
+
+/**
+ * PR numbers referenced by an issue timeline. Cross-referenced sources do
+ * not reliably carry a `pull_request` marker, so every source number is a
+ * candidate; fetchIssueTrace drops non-PR numbers via the pulls API.
+ */
+export function linkedPrNumbersFromTimeline(events: RawTimelineEvent[]): number[] {
+  const numbers = new Set<number>()
+  for (const event of events) {
+    const source = event.source?.issue
+    if (event.event === "cross-referenced" && source) {
+      numbers.add(source.number)
+    }
+  }
+  return [...numbers]
+}
+
+/** Union of PR numbers found via timeline cross-references and `#<n>` search. */
+export function mergeLinkedPrNumbers(timeline: number[], searchItems: RawIssueLike[]): number[] {
+  const numbers = new Set(timeline)
+  for (const item of searchItems) {
+    if (item.pull_request) numbers.add(item.number)
+  }
+  return [...numbers].sort((a, b) => a - b)
+}
+
+function toTraceIssue(issue: RawIssueLike): TraceIssue {
+  return {
+    number: issue.number,
+    title: issue.title ?? "",
+    url: issue.html_url ?? "",
+    state: issue.state === "closed" ? "closed" : "open",
+    openedAt: issue.created_at ?? "",
+    closedAt: issue.closed_at ?? null,
+    author: issue.user?.login ?? null,
+  }
+}
+
+function toTraceReview(review: RawReview): TraceReview {
+  return {
+    id: review.id,
+    author: review.user?.login ?? null,
+    state: review.state,
+    submittedAt: review.submitted_at ?? "",
+    url: review.html_url,
+  }
+}
+
+/** First Pages workflow run whose head commit matches the merge commit. */
+export function matchDeploymentRun(
+  runs: WorkflowRun[],
+  mergeCommitSha: string | null
+): DeploymentRun | null {
+  if (!mergeCommitSha) return null
+  const run = runs.find((candidate) => candidate.head_sha === mergeCommitSha)
+  return run ? toDeploymentRun(run, null) : null
+}
+
+export async function fetchIssueTrace(issueNumber: number, now = Date.now()): Promise<IssueTrace> {
+  const cacheKeyForIssue = `${TRACE_CACHE_KEY}-${issueNumber}`
+  const cached = readCache<IssueTrace>(cacheKeyForIssue, now)
+  if (cached) return cached
+
+  const issue = (await fetchJson(
+    `${API_BASE}/repos/${GITHUB_REPO}/issues/${issueNumber}`
+  )) as RawIssueLike
+
+  // Closing references and cross-references arrive via the issue timeline.
+  // It is a best-effort source: fall back to `#<n>` search alone on failure.
+  let timelineNumbers: number[] = []
+  try {
+    const events = (await fetchJson(
+      `${API_BASE}/repos/${GITHUB_REPO}/issues/${issueNumber}/timeline?per_page=100`
+    )) as RawTimelineEvent[]
+    timelineNumbers = linkedPrNumbersFromTimeline(Array.isArray(events) ? events : [])
+  } catch {
+    // Ignore; search below still finds title/body references.
+  }
+
+  const search = await searchIssues(
+    `repo:${GITHUB_REPO} type:pr #${issueNumber} in:title,body`,
+    20
+  )
+
+  const numbers = mergeLinkedPrNumbers(timelineNumbers, search.items ?? [])
+  const pullRequests = (
+    await Promise.all(
+      numbers.map(async (number): Promise<TracePullRequest | null> => {
+        try {
+          const [raw, reviews] = await Promise.all([
+            fetchJson(`${API_BASE}/repos/${GITHUB_REPO}/pulls/${number}`) as Promise<RawPullRequest>,
+            fetchJson(
+              `${API_BASE}/repos/${GITHUB_REPO}/pulls/${number}/reviews?per_page=30`
+            ) as Promise<RawReview[]>,
+          ])
+          return {
+            number: raw.number,
+            title: raw.title,
+            url: raw.html_url,
+            state: raw.state === "closed" ? "closed" : "open",
+            mergedAt: raw.merged_at,
+            mergeCommitSha: raw.merge_commit_sha,
+            openedAt: raw.created_at,
+            author: raw.user?.login ?? null,
+            reviews: (Array.isArray(reviews) ? reviews : [])
+              .filter((review) => review.submitted_at)
+              .map(toTraceReview)
+              .sort((a, b) => Date.parse(a.submittedAt) - Date.parse(b.submittedAt)),
+            deployment: null,
+          }
+        } catch {
+          // Timeline candidates may be issues, not pull requests; skip them.
+          return null
+        }
+      })
+    )
+  ).filter((pr): pr is TracePullRequest => pr !== null)
+
+  // Match Pages deployment runs by merge commit SHA.
+  if (pullRequests.some((pr) => pr.mergeCommitSha)) {
+    const runsData = (await fetchJson(
+      `${API_BASE}/repos/${GITHUB_REPO}/actions/workflows/${PAGES_WORKFLOW}.yml/runs?per_page=30`
+    )) as { workflow_runs?: WorkflowRun[] }
+    const runs = runsData.workflow_runs ?? []
+    for (const pr of pullRequests) {
+      pr.deployment = matchDeploymentRun(runs, pr.mergeCommitSha)
+    }
+  }
+
+  const trace: IssueTrace = {
+    issue: toTraceIssue(issue),
+    pullRequests: pullRequests.sort((a, b) => Date.parse(a.openedAt) - Date.parse(b.openedAt)),
+  }
+  writeCache(cacheKeyForIssue, trace, now)
+  return trace
 }
