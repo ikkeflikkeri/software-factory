@@ -13,36 +13,23 @@ npm run lint     # lint the source
 npm run preview  # preview the production build
 ```
 
-## Vercel deployment
+## Vercel deployment (Git integration)
 
-Deployments to Vercel run through GitHub Actions (`.github/workflows/deploy.yml`), not Vercel's Git
-integration. Vercel's Git integration is configured entirely in the Vercel dashboard and could not be
-set up from within this repository, while the Actions workflow keeps the trigger rules (deploy only
-from `main`) and the project root (`webapp/`) under version control.
+Deployments use **Vercel's Git integration**: Vercel watches this repository and deploys it
+automatically. No GitHub Actions workflow and no `VERCEL_TOKEN` secret are involved.
 
-### How it works
+- **Pull requests** get automatic preview deployments from Vercel.
+- **Every merge to `main`** triggers a production deployment.
+- The Vercel project root is the `webapp/` directory; `webapp/vercel.json` pins the install command,
+  build command (`npm run build`) and output directory (`dist`). No Vercel token, org ID or project
+  ID is stored in the repository.
 
-- **Pull requests** run the CI workflow (`.github/workflows/ci.yml`), which lints and builds the
-  webapp. They never deploy to production.
-- **A push to `main`** (i.e. a merged PR) runs the deploy workflow, which builds the webapp and
-  deploys it to Vercel's production environment with the Vercel CLI. The `webapp/` directory is the
-  project root: all commands run with `working-directory: webapp`.
+### One-time owner setup (Vercel dashboard)
 
-### Required repository secrets
-
-Add these in GitHub under *Settings → Secrets and variables → Actions*. Values come from the Vercel
-dashboard (*Project Settings → General*), or run `vercel link` locally to fetch them:
-
-| Secret | Value |
-| --- | --- |
-| `VERCEL_TOKEN` | A personal access token from [vercel.com/account/tokens](https://vercel.com/account/tokens) |
-| `VERCEL_ORG_ID` | The Vercel team/org ID (`orgId` in `.vercel/project.json`) |
-| `VERCEL_PROJECT_ID` | The Vercel project ID (`projectId` in `.vercel/project.json`) |
-
-### One-time owner setup
-
-1. Create a Vercel project for this repository (framework preset: **Vite**), with the **Root
-   Directory** set to `webapp/` so builds run from that folder.
-2. Create a token at [vercel.com/account/tokens](https://vercel.com/account/tokens) and add the
-   three secrets listed above to the GitHub repository.
-3. Merge a PR to `main` — the deploy workflow then deploys it to production.
+1. In Vercel, choose **Add New → Project** and import the `ikkeflikkeri/software-factory` repository
+   (the Vercel GitHub App must have access to it).
+2. Under **Build & Output Settings**, set **Root Directory** to `webapp/` so the build runs from that
+   folder. The framework preset **Vite** is detected automatically; leave the install command, build
+   command (`npm run build`) and output directory (`dist`) as configured in `webapp/vercel.json`.
+3. Deploy. From then on, every PR gets a preview deployment and every merge to `main` deploys to
+   production automatically.
