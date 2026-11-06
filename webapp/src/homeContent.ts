@@ -5,6 +5,14 @@
 
 export const appName = "Software Factory"
 
+/**
+ * Repository whose recent activity is shown in the Activity section.
+ */
+export const activitySource = {
+  owner: "ikkeflikkeri",
+  repo: "software-factory",
+}
+
 export const hero = {
   headline: "Placeholder headline: build software faster",
   description:
