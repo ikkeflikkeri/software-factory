@@ -27,23 +27,33 @@ The [webapp-ci](../../actions/workflows/webapp-ci.yml) workflow runs in `webapp/
 There is no separate `npm test` or `npm run typecheck` script; `npm run build` covers
 type-checking.
 
-## Vercel deployment (Git integration)
+## Vercel deployment (GitHub Actions + Vercel CLI)
 
-Deployments use **Vercel's Git integration**: Vercel watches this repository and deploys it
-automatically. No GitHub Actions workflow and no `VERCEL_TOKEN` secret are involved.
+Deployments run in GitHub Actions with the Vercel CLI; the Vercel Git integration is no longer used.
+Two workflows deploy the app from the `webapp/` directory:
 
-- **Pull requests** get automatic preview deployments from Vercel.
-- **Every merge to `main`** triggers a production deployment.
-- The Vercel project root is the `webapp/` directory; `webapp/vercel.json` pins the install command,
-  build command (`npm run build`) and output directory (`dist`). No Vercel token, org ID or project
-  ID is stored in the repository.
+- **Preview** ([`vercel-preview.yml`](../.github/workflows/vercel-preview.yml)): on every pull
+  request touching `webapp/`, runs `vercel pull --environment=preview`, `vercel build`,
+  `vercel deploy --prebuilt`, and posts the preview URL as a comment on the PR.
+- **Production** ([`vercel-production.yml`](../.github/workflows/vercel-production.yml)): on every
+  push to `main` touching `webapp/`, runs `vercel pull --environment=production`,
+  `vercel build --prod`, `vercel deploy --prebuilt --prod`.
 
-### One-time owner setup (Vercel dashboard)
+The Vercel CLI performs its own dependency install during `vercel build` (using the
+`installCommand` from `webapp/vercel.json`), so the workflows do not run `npm ci` before it.
+`webapp/vercel.json` keeps the Vite framework preset, install/build commands and output
+directory; the `.vercel/` link directory it generates locally is git-ignored and never committed.
 
-1. In Vercel, choose **Add New → Project** and import the `ikkeflikkeri/software-factory` repository
-   (the Vercel GitHub App must have access to it).
-2. Under **Build & Output Settings**, set **Root Directory** to `webapp/` so the build runs from that
-   folder. The framework preset **Vite** is detected automatically; leave the install command, build
-   command (`npm run build`) and output directory (`dist`) as configured in `webapp/vercel.json`.
-3. Deploy. From then on, every PR gets a preview deployment and every merge to `main` deploys to
-   production automatically.
+### Required repository secrets
+
+These three secrets must be configured by the repository owner under
+**Settings → Secrets and variables → Actions** before the deploy workflows can run
+(no values are stored in the repository):
+
+- `VERCEL_TOKEN` — a Vercel access token
+- `VERCEL_ORG_ID` — the Vercel team/user ID
+- `VERCEL_PROJECT_ID` — the Vercel project ID
+
+The token is passed only as an environment variable / CLI flag and is never printed.
+Automatic Git deployments for this project must be disabled in the Vercel dashboard so that
+only the GitHub Actions workflows deploy it.
