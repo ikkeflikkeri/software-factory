@@ -39,6 +39,10 @@ Two workflows deploy the app from the `webapp/` directory:
   push to `main` touching `webapp/`, runs `vercel pull --environment=production`,
   `vercel build --prod`, `vercel deploy --prebuilt --prod`.
 
+The workflows run the Vercel CLI from the repository root: the project's root directory is set to
+`webapp/` in the Vercel dashboard, and the CLI resolves that path relative to its working directory
+(running it inside `webapp/` would make it look for `webapp/webapp`).
+
 The Vercel CLI performs its own dependency install during `vercel build` (using the
 `installCommand` from `webapp/vercel.json`), so the workflows do not run `npm ci` before it.
 `webapp/vercel.json` keeps the Vite framework preset, install/build commands and output
